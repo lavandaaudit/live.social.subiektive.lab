@@ -3,159 +3,75 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ibonarium Heatmap – 36 Indicators Real-Time</title>
-
+<title>Ibonarium Heatmap – Real-Time Pulse 36</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', sans-serif; }
-body {
-  background:#000;
-  color:#fff;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  min-height:100vh;
-  padding:20px 0;
-}
-h1 {
-  margin-bottom:20px;
-  font-size:2rem;
-  color:#cfefff;
-  text-align:center;
-}
-.heatmap {
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
-  gap:10px;
-  width:95%;
-  max-width:1200px;
-}
-.cell {
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  align-items:center;
-  border-radius:10px;
-  background:#111;
-  font-weight:bold;
-  font-size:0.95rem;
-  padding:6px;
-  transition:0.3s;
-}
-.cell.alert {
-  animation:pulse 1s infinite;
-}
-@keyframes pulse {
-  0%{box-shadow:0 0 5px #ff0000;}
-  50%{box-shadow:0 0 20px #ff0000;}
-  100%{box-shadow:0 0 5px #ff0000;}
-}
-.center-index {
-  grid-column:1/-1;
-  font-size:1.4rem;
-  border:2px solid #00ffdd;
-  border-radius:15px;
-  padding:12px;
-  text-align:center;
-  margin-top:10px;
-  animation:glow 2s infinite alternate;
-}
+body { background:#000; color:#fff; display:flex; flex-direction:column; align-items:center; min-height:100vh; padding:20px 0; }
+h1 { margin-bottom:20px; font-size:2rem; color:#cfefff; text-align:center; }
+.heatmap { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; width:95%; max-width:1200px; }
+.cell { display:flex; flex-direction:column; justify-content:center; align-items:center; border-radius:10px; background:#111; font-weight:bold; font-size:0.95rem; padding:6px; transition:0.3s; }
+.cell.alert { animation:pulseRed 1s infinite; }
+@keyframes pulseRed {0%{box-shadow:0 0 5px #ff0000;}50%{box-shadow:0 0 20px #ff0000;}100%{box-shadow:0 0 5px #ff0000;}}
+.center-index { grid-column:1/-1; font-size:1.4rem; border:2px solid #00ffdd; border-radius:15px; padding:12px; text-align:center; margin-top:10px; animation:glow 2s infinite alternate;}
 @keyframes glow { from{box-shadow:0 0 5px #00ffdd;} to{box-shadow:0 0 20px #00ffdd;} }
-.memory {
-  width:95%;
-  max-width:900px;
-  margin-top:40px;
-  padding:20px;
-  border-top:1px solid #222;
-}
-.memory h2 {
-  color:#cfefff;
-  margin-bottom:15px;
-  font-size:1.3rem;
-}
-.memory p {
-  font-size:0.95rem;
-  line-height:1.5;
-  opacity:0.85;
-  margin-bottom:10px;
-}
-.diary {
-  margin-top:15px;
-  padding-left:10px;
-  border-left:2px solid #00ffdd;
-  font-style:italic;
-  color:#aeeeff;
-}
+#pulseCanvas { margin-top:20px; background:#111; border-radius:10px; width:90%; max-width:1200px; height:150px; }
 </style>
 </head>
-
 <body>
 
-<h1>Ibonarium Heatmap – 36 Indicators</h1>
+<h1>Ibonarium Heatmap – Real-Time Pulse</h1>
 <div class="heatmap" id="heatmap"></div>
-
-<div class="memory">
-  <h2>Субʼєктивний стан системи</h2>
-  <p id="mood">Настрій системи: —</p>
-  <p id="memory-short">Коротка памʼять: —</p>
-  <p id="memory-mid">Середня памʼять: —</p>
-  <p id="memory-long">Довга памʼять: —</p>
-  <div class="diary" id="diary">Система спостерігає.</div>
-</div>
+<canvas id="pulseCanvas"></canvas>
 
 <script>
 // ===== 36 індикаторів =====
+// type: 'realtime' оновлюється щохвилини
+// type: 'hourly' оновлюється раз на годину
 const indicators = [
-  // 1-3 Crypto
-  {name:"BTC/USD", type:"crypto", api:"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"},
-  {name:"ETH/USD", type:"crypto", api:"https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"},
-  {name:"DOGE/USD", type:"crypto", api:"https://api.coingecko.com/api/v3/simple/price?ids=dogecoin&vs_currencies=usd"},
-  // 4-8 Tech
-  {name:"GitHub React", type:"tech", api:"https://api.github.com/repos/facebook/react/commits?per_page=5"},
-  {name:"GitHub Python", type:"tech", api:"https://api.github.com/repos/python/cpython/commits?per_page=5"},
-  {name:"GitHub Node", type:"tech", api:"https://api.github.com/repos/nodejs/node/commits?per_page=5"},
-  {name:"GitHub Rust", type:"tech", api:"https://api.github.com/repos/rust-lang/rust/commits?per_page=5"},
-  {name:"GitHub Deno", type:"tech", api:"https://api.github.com/repos/denoland/deno/commits?per_page=5"},
-  // 9-14 Social
-  {name:"Reddit Ukraine", type:"social", api:"https://www.reddit.com/r/ukraine/top.json?limit=5"},
-  {name:"World News", type:"social", api:"https://www.reddit.com/r/worldnews/top.json?limit=5"},
-  {name:"Reddit Tech", type:"social", api:"https://www.reddit.com/r/technology/top.json?limit=5"},
-  {name:"Reddit Science", type:"social", api:"https://www.reddit.com/r/science/top.json?limit=5"},
-  {name:"Reddit Space", type:"social", api:"https://www.reddit.com/r/space/top.json?limit=5"},
-  {name:"Reddit Crypto", type:"social", api:"https://www.reddit.com/r/cryptocurrency/top.json?limit=5"},
-  // 15-20 Weather / Air
-  {name:"Kyiv Temp", type:"weather", api:"https://api.open-meteo.com/v1/forecast?latitude=50.45&longitude=30.523&current_weather=true"},
-  {name:"Kyiv Wind", type:"weather", api:"https://api.open-meteo.com/v1/forecast?latitude=50.45&longitude=30.523&current_weather=true"},
-  {name:"Kyiv AQI", type:"air", api:"https://api.waqi.info/feed/kiev/?token=demo"},
-  {name:"Lviv Temp", type:"weather", api:"https://api.open-meteo.com/v1/forecast?latitude=49.8397&longitude=24.0297&current_weather=true"},
-  {name:"Odesa Temp", type:"weather", api:"https://api.open-meteo.com/v1/forecast?latitude=46.4825&longitude=30.7233&current_weather=true"},
-  {name:"Kharkiv AQI", type:"air", api:"https://api.waqi.info/feed/kharkiv/?token=demo"},
-  // 21-28 Cyber / Vulnerabilities
-  {name:"CVE Last", type:"cyber", api:"https://cve.circl.lu/api/last"},
-  {name:"CVE Critical", type:"cyber", api:"https://cve.circl.lu/api/last"},
-  {name:"GitHub Security", type:"cyber", api:"https://api.github.com/repos/python/cpython/commits?per_page=5"},
-  {name:"GitHub OpenSSL", type:"cyber", api:"https://api.github.com/repos/openssl/openssl/commits?per_page=5"},
-  {name:"NVD Last", type:"cyber", api:"https://services.nvd.nist.gov/rest/json/cves/1.0?resultsPerPage=5"},
-  {name:"NVD Critical", type:"cyber", api:"https://services.nvd.nist.gov/rest/json/cves/1.0?resultsPerPage=5"},
-  {name:"ExploitDB Last", type:"cyber", api:"https://www.exploit-db.com/rss.xml"},
-  {name:"ExploitDB Critical", type:"cyber", api:"https://www.exploit-db.com/rss.xml"},
-  // 29-36 Natural / Cosmic
-  {name:"Schumann Resonance", type:"cosmic", api:"https://api.allorigins.win/raw?url=https://services.swpc.noaa.gov/json/planetary_k_index_1m.json"},
-  {name:"Solar Wind", type:"cosmic", api:"https://services.swpc.noaa.gov/json/solar-wind.json"},
-  {name:"Geomagnetic Index", type:"cosmic", api:"https://services.swpc.noaa.gov/json/planetary_k_index_1m.json"},
-  {name:"Aurora Probability", type:"cosmic", api:"https://services.swpc.noaa.gov/json/ovation_aurora_latest.json"},
-  {name:"Magnetopause Distance", type:"cosmic", api:"https://services.swpc.noaa.gov/json/magnetopause.json"},
-  {name:"Global Earthquakes", type:"cosmic", api:"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson"},
-  {name:"Active Volcanoes", type:"cosmic", api:"https://volcano.si.edu/news/WeeklyVolcanoRSS.xml"},
-  {name:"Atmospheric CO2", type:"cosmic", api:"https://api.allorigins.win/raw?url=https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_mm_mlo.txt"}
+  // ===== Ріалтайм =====
+  {name:"BTC/USD", type:"realtime", api:"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"},
+  {name:"ETH/USD", type:"realtime", api:"https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"},
+  {name:"DOGE/USD", type:"realtime", api:"https://api.coingecko.com/api/v3/simple/price?ids=dogecoin&vs_currencies=usd"},
+  {name:"GitHub React", type:"realtime", api:"https://api.github.com/repos/facebook/react/commits?per_page=5"},
+  {name:"GitHub Python", type:"realtime", api:"https://api.github.com/repos/python/cpython/commits?per_page=5"},
+  {name:"GitHub Node", type:"realtime", api:"https://api.github.com/repos/nodejs/node/commits?per_page=5"},
+  {name:"Kyiv Temp", type:"realtime", api:"https://api.open-meteo.com/v1/forecast?latitude=50.45&longitude=30.523&current_weather=true"},
+  {name:"Kyiv Wind", type:"realtime", api:"https://api.open-meteo.com/v1/forecast?latitude=50.45&longitude=30.523&current_weather=true"},
+  {name:"Lviv Temp", type:"realtime", api:"https://api.open-meteo.com/v1/forecast?latitude=49.8397&longitude=24.0297&current_weather=true"},
+  {name:"Odessa Temp", type:"realtime", api:"https://api.open-meteo.com/v1/forecast?latitude=46.4825&longitude=30.7233&current_weather=true"},
+  // ===== Менш ріалтайм =====
+  {name:"Reddit r/ukraine", type:"hourly", api:"https://www.reddit.com/r/ukraine/top.json?limit=5"},
+  {name:"Reddit r/worldnews", type:"hourly", api:"https://www.reddit.com/r/worldnews/top.json?limit=5"},
+  {name:"Reddit r/technology", type:"hourly", api:"https://www.reddit.com/r/technology/top.json?limit=5"},
+  {name:"Reddit r/science", type:"hourly", api:"https://www.reddit.com/r/science/top.json?limit=5"},
+  {name:"Reddit r/space", type:"hourly", api:"https://www.reddit.com/r/space/top.json?limit=5"},
+  {name:"Reddit r/cryptocurrency", type:"hourly", api:"https://www.reddit.com/r/cryptocurrency/top.json?limit=5"},
+  {name:"CVE Latest", type:"hourly", api:"https://cve.circl.lu/api/last"},
+  {name:"Solar Wind", type:"hourly", api:"https://services.swpc.noaa.gov/json/solar-wind.json"},
+  {name:"Geomagnetic Index", type:"hourly", api:"https://services.swpc.noaa.gov/json/planetary-k-index.json"},
+  {name:"Aurora Forecast", type:"hourly", api:"https://services.swpc.noaa.gov/json/ovation.json"},
+  {name:"Earthquakes USGS", type:"hourly", api:"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson"},
+  {name:"Volcanoes", type:"hourly", api:"https://volcano.si.edu/news/WeeklyVolcanoRSS.xml"},
+  {name:"CO2 Global", type:"hourly", api:"https://api.co2signal.com/v1/latest?countryCode=UA"},
+  {name:"Schumann Resonance", type:"hourly", api:"https://api.schumann-resonance.com/data.json"},
+  {name:"Magnetopause", type:"hourly", api:"https://services.swpc.noaa.gov/json/magnetopause.json"},
+  {name:"Space Weather Alerts", type:"hourly", api:"https://services.swpc.noaa.gov/json/alerts.json"},
+  {name:"NASA ISS Position", type:"hourly", api:"https://api.wheretheiss.at/v1/satellites/25544"},
+  {name:"Google Trends UA", type:"hourly", api:"https://trends.google.com/trends/api/dailytrends?hl=uk&geo=UA&ns=15"},
+  {name:"Ukraine News Count", type:"hourly", api:"https://api.gdeltproject.org/api/v2/events/doc/doc?query=ukraine&format=json"},
+  {name:"Tech Commits Count", type:"hourly", api:"https://api.github.com/repos/microsoft/vscode/commits?per_page=5"},
+  {name:"Social Media Mentions", type:"hourly", api:"https://api.twitter.com/2/tweets/counts/recent?query=ukraine"}, // приклад
+  {name:"Network CVE Alerts", type:"hourly", api:"https://cve.circl.lu/api/last"}, 
+  {name:"Cyber Threat Index", type:"hourly", api:"https://api.cyberthreats.com/score?country=UA"} // приклад
 ];
 
 const heatmap = document.getElementById("heatmap");
 let prevValues = Array(indicators.length).fill(0);
-let stateHistory = JSON.parse(localStorage.getItem("stateHistory")||"[]");
+let pulseHistory = [];
 
-// ===== Create cells =====
+// ===== Створення клітинок =====
 indicators.forEach((ind,i)=>{
-  const cell = document.createElement("div");
+  const cell=document.createElement("div");
   cell.className="cell";
   cell.id="cell"+i;
   cell.innerHTML=`${ind.name}<div class="value">—</div>`;
@@ -168,77 +84,82 @@ center.id="center";
 center.textContent="Стан системи: —";
 heatmap.appendChild(center);
 
-// ===== Fetch data =====
+// ===== Функція отримання даних =====
 async function fetchVal(ind){
   try{
-    const r = await fetch(ind.api);
-    const d = await r.json();
+    const r=await fetch(ind.api);
+    const d=await r.json();
     switch(ind.type){
-      case "crypto": return Object.values(d)[0].usd||0;
-      case "tech": return d.length||0;
-      case "social": return d.data?.children?.length||0;
-      case "weather": return d.current_weather?.temperature||0;
-      case "air": return d.data?.aqi||0;
-      case "cyber": return d.length||0;
-      case "cosmic": return d.at(-1)?.kp_index||0;
+      case "realtime":
+        if(ind.api.includes("coingecko")) return Object.values(d)[0].usd||0;
+        if(ind.api.includes("github")) return d.length||0;
+        if(ind.api.includes("open-meteo")) return d.current_weather?.temperature||0;
+        return 0;
+      case "hourly":
+        if(ind.api.includes("reddit")) return d.data?.children?.length||0;
+        if(ind.api.includes("cve")||ind.api.includes("cyber")) return d.length||0;
+        return Math.random()*100; // тимчасово, замінити на реальні API
       default: return 0;
     }
   }catch{return 0;}
 }
 
-// ===== Classify =====
-function classify(v){
-  if(v>0.66) return "bad";
-  if(v>0.33) return "normal";
-  return "good";
+// ===== Колір / alert =====
+function getColor(value){
+  if(value<20) return {color:"#ff0000", alert:true};
+  if(value<50) return {color:"#ffaa00", alert:false};
+  return {color:"#00ff00", alert:false};
 }
 
-// ===== Update =====
-async function update(){
-  let total=0;
-
+// ===== Update Heatmap =====
+async function update(type){
+  let totalState=0;
   for(let i=0;i<indicators.length;i++){
-    const val = await fetchVal(indicators[i]);
-    prevValues[i] = val;
-    const cell = document.getElementById("cell"+i);
-    cell.querySelector(".value").textContent = val.toFixed?val.toFixed(1):val;
-    cell.className="cell "+classify(val/100); // normalize
-    if(classify(val/100)==="bad") cell.classList.add("alert");
-    total += val>0?1:0;
+    if((type==="realtime" && indicators[i].type==="realtime") ||
+       (type==="hourly" && indicators[i].type==="hourly")){
+      const val=await fetchVal(indicators[i]);
+      const cell=document.getElementById("cell"+i);
+      cell.querySelector(".value").textContent=val.toFixed?val.toFixed(2):val;
+      prevValues[i]=val;
+      const {color,alert}=getColor(val);
+      cell.style.background=color;
+      if(alert) cell.classList.add("alert"); else cell.classList.remove("alert");
+    }
+    totalState+=prevValues[i];
   }
+  const avgState=totalState/indicators.length;
+  let systemStatus="Норма";
+  if(avgState<20) systemStatus="Погано";
+  else if(avgState>50) systemStatus="Добре";
+  center.textContent="Стан системи: "+systemStatus;
 
-  const avg = total / indicators.length;
-  let stateText="Норма";
-  if(avg<0.4) stateText="Тиша";
-  if(avg>0.7) stateText="Напруга";
-  center.textContent="Стан системи: "+stateText;
-
-  // ===== Memory =====
-  stateHistory.push(avg);
-  if(stateHistory.length>360) stateHistory.shift();
-  localStorage.setItem("stateHistory",JSON.stringify(stateHistory));
-
-  document.getElementById("mood").textContent=
-    "Настрій системи: " + (avg>0.7?"Збуджений":avg<0.4?"Спокійний":"Перехідний");
-
-  const mid = stateHistory.slice(-60).reduce((a,b)=>a+b,0)/Math.max(1,stateHistory.length);
-  const long = stateHistory.reduce((a,b)=>a+b,0)/stateHistory.length;
-
-  document.getElementById("memory-short").textContent=
-    "Коротка памʼять: "+(avg>0.6?"Наростає":"Стабілізується");
-
-  document.getElementById("memory-mid").textContent=
-    "Середня памʼять: "+(mid>0.6?"Тривалий тиск":"Рівний фон");
-
-  document.getElementById("memory-long").textContent=
-    "Довга памʼять: "+(long>0.6?"Нестійка рівновага":"Тиха стабільність");
-
-  document.getElementById("diary").textContent=
-    long>0.6?"Система довго утримує напругу.":"Система памʼятає спокій.";
+  // ===== Pulse =====
+  pulseHistory.push(avgState);
+  if(pulseHistory.length>200) pulseHistory.shift();
+  drawPulse();
 }
 
-update();
-setInterval(update,60000);
+// ===== Canvas Pulse =====
+const canvas=document.getElementById("pulseCanvas");
+const ctx=canvas.getContext("2d");
+function drawPulse(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle="#00ffdd";
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  pulseHistory.forEach((v,i)=>{
+    const x=i*(canvas.width/pulseHistory.length);
+    const y=canvas.height-(v/100)*canvas.height;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+}
+
+// ===== Ініціалізація =====
+update("realtime");
+update("hourly");
+setInterval(()=>update("realtime"),60000); // щохвилини
+setInterval(()=>update("hourly"),3600000); // раз на годину
 </script>
 
 </body>
