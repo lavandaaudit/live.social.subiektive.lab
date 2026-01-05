@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ibonarium Heatmap — Subjective State</title>
+
+<style>
+* { margin:0; padding:0; box-sizing:border-box; font-family:system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
+body {
+  background:#000;
+  color:#e6f2ff;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  min-height:100vh;
+}
+h1 {
+  margin:20px 0;
+  font-size:2rem;
+  color:#cfefff;
+  text-align:center;
+}
+.heatmap {
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(140px,1fr));
+  gap:10px;
+  width:95%;
+  max-width:1200px;
+}
+.cell {
+  background:#111;
+  border-radius:12px;
+  padding:8px;
+  text-align:center;
+  font-size:0.9rem;
+  font-weight:600;
+  transition:0.3s;
+  position:relative;
+}
+.cell.alert { animation:pulse 1s infinite; }
+@keyframes pulse {
+  0%{box-shadow:0 0 5px #ff0033;}
+  50%{box-shadow:0 0 20px #ff0033;}
+  100%{box-shadow:0 0 5px #ff0033;}
+}
+.value { font-size:1.1rem; margin-top:4px; }
+.arrow { font-size:0.9rem; }
+.tooltip {
+  position:absolute;
+  bottom:110%;
+  background:rgba(0,0,0,0.85);
+  padding:6px 10px;
+  border-radius:6px;
+  font-size:0.75rem;
+  opacity:0;
+  pointer-events:none;
+  transition:0.2s;
+  white-space:nowrap;
+}
+.cell:hover .tooltip { opacity:1; }
+
+.center {
+  grid-column:1/-1;
+  background:#0a0a0a;
+  border:2px solid #00ffee;
+  border-radius:18px;
+  padding:18px;
+  font-size:1.5rem;
+  text-align:center;
+  animation:glow 2s infinite alternate;
+}
+@keyframes glow {
+  from{box-shadow:0 0 6px #00ffee;}
+  to{box-shadow:0 0 22px #00ffee;}
+}
+</style>
+</head>
+
+<body>
+
+<h1>Ibonarium Heatmap</h1>
+<div class="heatmap" id="heatmap"></div>
+
+<script>
+const indicators = [
+  // Планета
+  {n:"🌍 Earthquakes (1h)", t:"planet", u:"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson"},
+  {n:"☀️ Solar X-ray", t:"planet", u:"https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json"},
+  {n:"🧲 Geo tension", t:"planet", u:"https://services.swpc.noaa.gov/json/kp-index.json"},
+
+  // Погода
+  {n:"🌡️ Temp Kyiv", t:"weather", u:"https://api.open-meteo.com/v1/forecast?latitude=50.45&longitude=30.52&current_weather=true"},
+  {n:"💨 Wind Kyiv", t:"weather", u:"https://api.open-meteo.com/v1/forecast?latitude=50.45&longitude=30.52&current_weather=true"},
+  {n:"🌫️ AQI Kyiv", t:"air", u:"https://api.waqi.info/feed/kiev/?token=demo"},
+
+  // Інформація
+  {n:"📰 GDELT UA", t:"info", u:"https://api.gdeltproject.org/api/v2/events/doc/doc?query=ukraine&format=json"},
+  {n:"🌐 GDELT World", t:"info", u:"https://api.gdeltproject.org/api/v2/events/doc/doc?query=world&format=json"},
+  {n:"📈 Trends UA", t:"info", u:"https://trends.google.com/trends/api/dailytrends?geo=UA"},
+
+  // Соціум
+  {n:"💬 Reddit UA", t:"social", u:"https://www.reddit.com/r/ukraine/new.json?limit=10"},
+  {n:"💬 Reddit World", t:"social", u:"https://www.reddit.com/r/worldnews/new.json?limit=10"},
+  {n:"💬 Reddit Global", t:"social", u:"https://www.reddit.com/new.json?limit=10"},
+
+  // Техно
+  {n:"💻 GitHub events", t:"tech", u:"https://api.github.com/events"},
+  {n:"⚛️ React commits", t:"tech", u:"https://api.github.com/repos/facebook/react/commits?per_page=5"},
+  {n:"🐍 Python commits", t:"tech", u:"https://api.github.com/repos/python/cpython/commits?per_page=5"},
+  {n:"📦 NPM React", t:"tech", u:"https://api.npmjs.org/downloads/point/last-day/react"},
+  {n:"📦 NPM Vue", t:"tech", u:"https://api.npmjs.org/downloads/point/last-day/vue"},
+
+  // Ризик
+  {n:"🛡️ CVE new", t:"risk", u:"https://cve.circl.lu/api/last"},
+  {n:"🚨 CERT alerts", t:"risk", u:"https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"},
+
+  // Крипта (настрій)
+  {n:"₿ BTC", t:"crypto", u:"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"},
+  {n:"◆ ETH", t:"crypto", u:"https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"},
+  {n:"🐕 DOGE", t:"crypto", u:"https://api.coingecko.com/api/v3/simple/price?ids=dogecoin&vs_currencies=usd"}
+];
+
+const map = document.getElementById("heatmap");
+let prev = [];
+
+indicators.forEach((i,idx)=>{
+  const d=document.createElement("div");
+  d.className="cell";
+  d.id="c"+idx;
+  d.innerHTML=`${i.n}<div class=value>---</div><div class=arrow></div><div class=tooltip>loading</div>`;
+  map.appendChild(d);
+});
+
+const center=document.createElement("div");
+center.className="center";
+center.id="center";
+center.textContent="Стан системи: ---";
+map.appendChild(center);
+
+async function getVal(ind){
+  try{
+    const r=await fetch(ind.u); const j=await r.json();
+    switch(ind.t){
+      case"planet": return j.length||0;
+      case"weather": return j.current_weather?.temperature||0;
+      case"air": return j.data?.aqi||0;
+      case"info": return j.totalCount||0;
+      case"social": return j.data?.children?.length||0;
+      case"tech": return j.length||0;
+      case"risk": return j.length||0;
+      case"crypto": return Object.values(j)[0].usd;
+      default:return 0;
+    }
+  }catch{ return 0;}
+}
+
+function color(v){
+  if(v===0) return ["#220000",0];
+  if(v<5) return ["#664400",1];
+  return ["#003322",2];
+}
+
+async function update(){
+  let sum=0;
+  for(let i=0;i<indicators.length;i++){
+    const v=await getVal(indicators[i]);
+    const c=document.getElementById("c"+i);
+    c.querySelector(".value").textContent=Number(v).toFixed?Number(v).toFixed(2):v;
+    c.querySelector(".tooltip").textContent=v;
+    const [bg,s]=color(v);
+    c.style.background=bg;
+    if(s===0) c.classList.add("alert"); else c.classList.remove("alert");
+    sum+=s;
+  }
+  const avg=sum/indicators.length;
+  center.textContent="Стан системи: "+(avg<0.8?"Погано":avg>1.5?"Добре":"Норма");
+}
+
+update();
+setInterval(update,60000);
+</script>
+
+</body>
+</html>
