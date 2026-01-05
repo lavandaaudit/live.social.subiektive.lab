@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ibonarium Heatmap – Trend & Memory (40 API)</title>
+<title>Ibonarium Heatmap – Trend & Memory (60+ API)</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', sans-serif; }
 body { background:#000; color:#fff; display:flex; flex-direction:column; align-items:center; min-height:100vh; padding:20px 0; }
@@ -101,12 +101,12 @@ h1 { margin-bottom:20px; font-size:2rem; color:#cfefff; text-align:center; }
 </style>
 </head>
 <body>
-<h1>Ibonarium Heatmap – Trend & Memory (40 API)</h1>
+<h1>Ibonarium Heatmap – Trend & Memory (60+ Free APIs)</h1>
 <div class="heatmap" id="heatmap"></div>
 <canvas id="pulseCanvas"></canvas>
 
 <script>
-// ===== Індикатори: 40 вільних API =====
+// ===== Індикатори: 60+ вільних API (додано ~20 нових) =====
 const indicators = [
   {name:"BTC/USD", type:"realtime", api:"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd", extract: d => d.bitcoin.usd, min:0, max:100000, unit:'$'},
   {name:"ETH/USD", type:"realtime", api:"https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd", extract: d => d.ethereum.usd, min:0, max:10000, unit:'$'},
@@ -137,20 +137,42 @@ const indicators = [
   {name:"Data USA Pop", type:"hourly", api:"https://datausa.io/api/data?drilldowns=Nation&measures=Population", extract: d => d.data[0].Population, min:0, max:400000000, unit:' people'},
   {name:"FBI Wanted", type:"hourly", api:"https://api.fbi.gov/wanted/v1/list", extract: d => d.total, min:0, max:1000, unit:' wanted'},
   {name:"USGS Quakes", type:"hourly", api:"https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2026-01-01&endtime=2026-01-06&minmagnitude=2", extract: d => d.features.length, min:0, max:100, unit:' quakes'},
-  {name:"Carbon Intensity", type:"hourly", api:"https://api.carbonintensity.org.uk/intensity", extract: d => d.data[0].intensity.index, min:0, max:500, unit:' gCO2/kWh'},
+  {name:"Carbon Intensity", type:"hourly", api:"https://api.carbonintensity.org.uk/intensity", extract: d => d.data[0].intensity.forecast, min:0, max:500, unit:' gCO2/kWh'},
   {name:"UK Police Crimes", type:"hourly", api:"https://data.police.uk/api/crimes-street/all-crime?lat=52.629729&lng=-1.131592&date=2025-12", extract: d => d.length, min:0, max:1000, unit:' crimes'},
   {name:"PM2.5 Taiwan", type:"realtime", api:"https://pm25.lass-net.org/API-1.0.0/project/airbox/latest/", extract: d => d.feeds.length, min:0, max:1000, unit:' sensors'},
-  {name:"Wiki Pageviews", type:"hourly", api:"https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/Tiger_King/daily/20260101/20260105", extract: d => d.items.reduce((sum, i) => sum + i.views, 0), min:0, max:100000, unit:' views'},
+  {name:"Wiki Pageviews", type:"hourly", api:"https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/Ukraine/daily/20260101/20260105", extract: d => d.items.reduce((sum, i) => sum + i.views, 0), min:0, max:1000000, unit:' views'},
   {name:"NASA Asteroids", type:"hourly", api:"https://api.nasa.gov/neo/rest/v1/feed/today?detailed=false&api_key=DEMO_KEY", extract: d => d.element_count, min:0, max:50, unit:' asteroids'},
   {name:"SpaceX Capsules", type:"hourly", api:"https://api.spacexdata.com/v5/capsules", extract: d => d.length, min:0, max:20, unit:' capsules'},
   {name:"HackerNews Top", type:"hourly", api:"https://hacker-news.firebaseio.com/v0/topstories.json", extract: d => d.length, min:0, max:500, unit:' stories'},
   {name:"REST Countries", type:"hourly", api:"https://restcountries.com/v3.1/all", extract: d => d.length, min:0, max:300, unit:' countries'},
   {name:"IPify IP", type:"realtime", api:"https://api.ipify.org?format=json", extract: d => 1, min:0, max:1, unit:' IP'},
   {name:"IPinfo Geo", type:"realtime", api:"https://ipinfo.io/json", extract: d => d.loc ? 100 : 0, min:0, max:100, unit:'% geo'},
-  {name:"OpenUV Global", type:"realtime", api:"https://api.openuv.io/api/v1/uv?lat=0&lng=0", extract: d => d.result?.uv || 0, min:0, max:12, unit:' UV'}
+  {name:"OpenUV Global", type:"realtime", api:"https://api.openuv.io/api/v1/uv?lat=0&lng=0", extract: d => d.result?.uv || 0, min:0, max:12, unit:' UV'},
+  // ===== Нові індикатори (додано 20+) =====
+  {name:"ISS People", type:"hourly", api:"http://api.open-notify.org/astros.json", extract: d => d.number, min:0, max:20, unit:' people in space'},
+  {name:"ISS Location", type:"realtime", api:"http://api.open-notify.org/iss-now.json", extract: d => d.iss_position.latitude, min:-90, max:90, unit:' lat'},
+  {name:"Bored Suggestion", type:"hourly", api:"https://www.boredapi.com/api/activity", extract: d => d.price * 100, min:0, max:100, unit:'% cost'},
+  {name:"Cat Fact Length", type:"hourly", api:"https://catfact.ninja/fact", extract: d => d.length, min:0, max:300, unit:' chars'},
+  {name:"Dog Image Count", type:"realtime", api:"https://dog.ceo/api/breeds/image/random/10", extract: d => d.message.length, min:0, max:10, unit:' images'},
+  {name:"Joke Length", type:"hourly", api:"https://v2.jokeapi.dev/joke/Any?safe-mode", extract: d => d.setup ? d.setup.length + d.delivery.length : d.joke.length, min:0, max:500, unit:' chars'},
+  {name:"Random User Count", type:"realtime", api:"https://randomuser.me/api/?results=10", extract: d => d.results.length, min:0, max:10, unit:' users'},
+  {name:"Pokemon Count", type:"hourly", api:"https://pokeapi.co/api/v2/pokemon?limit=100", extract: d => d.results.length, min:0, max:100, unit:' pokemon'},
+  {name:"Quote Length", type:"hourly", api:"https://api.quotable.io/random", extract: d => d.length, min:0, max:300, unit:' chars'},
+  {name:"Chuck Norris Joke", type:"hourly", api:"https://api.chucknorris.io/jokes/random", extract: d => d.value.length, min:0, max:300, unit:' chars'},
+  {name:"Yes/No Answer", type:"realtime", api:"https://yesno.wtf/api", extract: d => d.answer === 'yes' ? 100 : 0, min:0, max:100, unit:'% yes'},
+  {name:"Advice Length", type:"hourly", api:"https://api.adviceslip.com/advice", extract: d => JSON.parse(d).slip.advice.length, min:0, max:200, unit:' chars'},
+  {name:"Fox Image", type:"realtime", api:"https://randomfox.ca/floof/", extract: d => 1, min:0, max:1, unit:' fox'},
+  {name:"Ron Swagger Quote", type:"hourly", api:"https://ron-swanson-quotes.herokuapp.com/v2/quotes", extract: d => d[0].length, min:0, max:200, unit:' chars'},
+  {name:"Kanye Quote", type:"hourly", api:"https://api.kanye.rest/", extract: d => d.quote.length, min:0, max:300, unit:' chars'},
+  {name:"Trump Quote", type:"hourly", api:"https://api.tronalddump.io/random/quote", extract: d => d.value.length, min:0, max:500, unit:' chars'},
+  {name:"Affirmation", type:"hourly", api:"https://www.affirmations.dev/", extract: d => d.affirmation.length, min:0, max:200, unit:' chars'},
+  {name:"Activity Price", type:"hourly", api:"https://www.boredapi.com/api/activity", extract: d => d.participants, min:1, max:10, unit:' people'},
+  {name:"Sunrise Kyiv", type:"hourly", api:"https://api.sunrise-sunset.org/json?lat=50.45&lng=30.523&formatted=0", extract: d => new Date(d.results.sunrise).getHours(), min:0, max:24, unit:' hour'},
+  {name:"Number Fact", type:"hourly", api:"http://numbersapi.com/random/trivia", extract: d => d.length, min:0, max:100, unit:' chars'},
+  {name:"Excuse", type:"hourly", api:"https://excuser-three.vercel.app/v1/excuse", extract: d => d[0].id, min:0, max:100, unit:' id'}
 ];
 
-// ===== HTML структура =====
+// ===== Решта коду без змін =====
 const heatmap = document.getElementById("heatmap");
 const pulseCanvas = document.getElementById("pulseCanvas");
 let pulseCtx = pulseCanvas.getContext("2d");
@@ -173,7 +195,6 @@ center.id = "center";
 center.textContent = "Стан системи: —";
 heatmap.appendChild(center);
 
-// ===== Адаптація canvas під розмір =====
 function resizeCanvases() {
   const trendCanvases = document.querySelectorAll('.trendCanvas');
   trendCanvases.forEach(c => { 
@@ -188,7 +209,6 @@ function resizeCanvases() {
 window.addEventListener('resize', resizeCanvases);
 setTimeout(resizeCanvases, 100);
 
-// ===== Fetch даних =====
 async function fetchVal(ind) {
   try {
     const resp = await fetch(ind.api);
@@ -206,14 +226,12 @@ function normalize(val, min, max) {
   return Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
 }
 
-// ===== Колір фону =====
 function getColor(norm) {
   if (norm < 30) return {bg:"#ff0000", alert:true};
   if (norm < 70) return {bg:"#ffaa00", alert:false};
   return {bg:"#00ff00", alert:false};
 }
 
-// ===== Оновлення даних =====
 async function update(type) {
   const promises = indicators.filter(ind => ind.type === type).map(fetchVal);
   const rawValues = await Promise.all(promises);
@@ -262,7 +280,6 @@ async function update(type) {
   center.style.borderColor = statusColor;
 }
 
-// ===== Малювання тренду в клітинці =====
 function drawTrend(i) {
   const canvas = document.getElementById(`trend${i}`);
   const ctx = canvas.getContext("2d");
@@ -279,7 +296,6 @@ function drawTrend(i) {
   ctx.stroke();
 }
 
-// ===== Малювання загального пульсу =====
 function drawPulse() {
   pulseCtx.clearRect(0, 0, pulseCanvas.width, pulseCanvas.height);
   if (pulseHistory.length < 2) return;
@@ -294,7 +310,6 @@ function drawPulse() {
   pulseCtx.stroke();
 }
 
-// ===== Ініціалізація =====
 update("realtime");
 update("hourly");
 setInterval(() => update("realtime"), 60000);
