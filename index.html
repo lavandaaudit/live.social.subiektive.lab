@@ -8,25 +8,103 @@
 * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', sans-serif; }
 body { background:#000; color:#fff; display:flex; flex-direction:column; align-items:center; min-height:100vh; padding:20px 0; }
 h1 { margin-bottom:20px; font-size:2rem; color:#cfefff; text-align:center; }
-.heatmap { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; width:95%; max-width:1400px; }
-.cell { display:flex; flex-direction:column; justify-content:center; align-items:center; border-radius:12px; background:#111; font-weight:bold; font-size:1rem; padding:8px; transition:0.3s; position:relative; cursor:pointer; }
-.cell.alert { animation:pulseRed 1s infinite; }
+.heatmap { 
+  display:grid; 
+  grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); 
+  gap:10px; 
+  width:95%; 
+  max-width:1400px; 
+}
+.cell { 
+  display:flex; 
+  flex-direction:column; 
+  justify-content:center; 
+  align-items:center; 
+  border-radius:14px; 
+  background:#111; 
+  font-weight:bold; 
+  font-size:0.95rem; 
+  padding:10px 6px; 
+  transition:all 0.4s ease; 
+  position:relative; 
+  cursor:pointer; 
+  box-shadow:0 4px 15px rgba(0,0,0,0.3);
+  border:1px solid #222;
+}
+.cell:hover { 
+  transform:translateY(-4px); 
+  box-shadow:0 8px 25px rgba(0,255,221,0.15); 
+}
+.cell.alert { 
+  animation:pulseRed 1.2s infinite; 
+  border-color:#ff0000; 
+}
 .cell:hover .tooltip { opacity:1; }
-.tooltip { position:absolute; bottom:100%; left:50%; transform:translateX(-50%); background:#333; padding:5px 10px; border-radius:5px; font-size:0.8rem; opacity:0; transition:0.2s; white-space:nowrap; z-index:10; }
-@keyframes pulseRed {0%{box-shadow:0 0 5px #ff0000;}50%{box-shadow:0 0 20px #ff0000;}100%{box-shadow:0 0 5px #ff0000;}}
-.center-index { grid-column:1/-1; font-size:1.5rem; border:2px solid #00ffdd; border-radius:15px; padding:14px; text-align:center; margin-top:12px; animation:glow 2s infinite alternate;}
-@keyframes glow { from{box-shadow:0 0 5px #00ffdd;} to{box-shadow:0 0 20px #00ffdd;} }
-#pulseCanvas { margin-top:20px; background:#111; border-radius:10px; width:90%; max-width:1400px; height:180px; }
-.trendCanvas { width:100%; height:90px; margin-top:6px; background:#111; border-radius:5px; }
-#exportBtn { margin-top:20px; padding:10px 20px; background:#00ffdd; color:#000; border:none; border-radius:5px; cursor:pointer; font-weight:bold; }
-@media (max-width:600px) { .cell { font-size:0.9rem; } .trendCanvas { height:70px; } }
+.tooltip { 
+  position:absolute; 
+  bottom:100%; 
+  left:50%; 
+  transform:translateX(-50%); 
+  background:#222; 
+  padding:6px 12px; 
+  border-radius:8px; 
+  font-size:0.8rem; 
+  opacity:0; 
+  transition:opacity 0.3s; 
+  white-space:nowrap; 
+  z-index:10; 
+  box-shadow:0 4px 15px rgba(0,0,0,0.5);
+  pointer-events:none;
+}
+@keyframes pulseRed {
+  0%{box-shadow:0 0 8px #ff0000;}
+  50%{box-shadow:0 0 25px #ff0000;}
+  100%{box-shadow:0 0 8px #ff0000;}
+}
+.center-index { 
+  grid-column:1/-1; 
+  font-size:1.6rem; 
+  border:3px solid #00ffdd; 
+  border-radius:18px; 
+  padding:16px; 
+  text-align:center; 
+  margin-top:14px; 
+  animation:glow 2.5s infinite alternate;
+  background:#111;
+  box-shadow:0 6px 20px rgba(0,255,221,0.2);
+}
+@keyframes glow { 
+  from{box-shadow:0 0 10px #00ffdd;} 
+  to{box-shadow:0 0 30px #00ffdd;} 
+}
+#pulseCanvas { 
+  margin-top:24px; 
+  background:linear-gradient(#111,#0a0a0a); 
+  border-radius:14px; 
+  width:90%; 
+  max-width:1400px; 
+  height:200px; 
+  box-shadow:0 6px 20px rgba(0,0,0,0.4);
+}
+.trendCanvas { 
+  width:100%; 
+  height:80px; 
+  margin-top:8px; 
+  background:#0f0f0f; 
+  border-radius:6px; 
+}
+@media (max-width:600px) { 
+  .cell { font-size:0.85rem; padding:8px 4px; } 
+  .trendCanvas { height:65px; } 
+  .center-index { font-size:1.4rem; }
+}
 </style>
 </head>
 <body>
-<h1>Ibonarium Heatmap – Trend & Memory (40 Free APIs)</h1>
+<h1>Ibonarium Heatmap – Trend & Memory (40 API)</h1>
 <div class="heatmap" id="heatmap"></div>
 <canvas id="pulseCanvas"></canvas>
-<button id="exportBtn">Експорт даних (JSON)</button>
+
 <script>
 // ===== Індикатори: 40 вільних API =====
 const indicators = [
@@ -63,15 +141,16 @@ const indicators = [
   {name:"UK Police Crimes", type:"hourly", api:"https://data.police.uk/api/crimes-street/all-crime?lat=52.629729&lng=-1.131592&date=2025-12", extract: d => d.length, min:0, max:1000, unit:' crimes'},
   {name:"PM2.5 Taiwan", type:"realtime", api:"https://pm25.lass-net.org/API-1.0.0/project/airbox/latest/", extract: d => d.feeds.length, min:0, max:1000, unit:' sensors'},
   {name:"Wiki Pageviews", type:"hourly", api:"https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/all-agents/Tiger_King/daily/20260101/20260105", extract: d => d.items.reduce((sum, i) => sum + i.views, 0), min:0, max:100000, unit:' views'},
-  {name:"NASA Asteroids", type:"hourly", api:"https://api.nasa.gov/neo/rest/v1/feed/today?detailed=false&api_key=DEMO_KEY", extract: d => d.element_count, min:0, max:50, unit:' asteroids'}, // DEMO_KEY OK for free
+  {name:"NASA Asteroids", type:"hourly", api:"https://api.nasa.gov/neo/rest/v1/feed/today?detailed=false&api_key=DEMO_KEY", extract: d => d.element_count, min:0, max:50, unit:' asteroids'},
   {name:"SpaceX Capsules", type:"hourly", api:"https://api.spacexdata.com/v5/capsules", extract: d => d.length, min:0, max:20, unit:' capsules'},
   {name:"HackerNews Top", type:"hourly", api:"https://hacker-news.firebaseio.com/v0/topstories.json", extract: d => d.length, min:0, max:500, unit:' stories'},
   {name:"REST Countries", type:"hourly", api:"https://restcountries.com/v3.1/all", extract: d => d.length, min:0, max:300, unit:' countries'},
-  {name:"IPify IP", type:"realtime", api:"https://api.ipify.org?format=json", extract: d => 1, min:0, max:1, unit:' IP'}, // Dummy value, for connectivity check
+  {name:"IPify IP", type:"realtime", api:"https://api.ipify.org?format=json", extract: d => 1, min:0, max:1, unit:' IP'},
   {name:"IPinfo Geo", type:"realtime", api:"https://ipinfo.io/json", extract: d => d.loc ? 100 : 0, min:0, max:100, unit:'% geo'},
-  {name:"OpenUV Global", type:"realtime", api:"https://api.openuv.io/api/v1/uv?lat=0&lng=0", extract: d => d.result.uv, min:0, max:12, unit:' UV'} // Requires key? But listed as free, assume no for demo
+  {name:"OpenUV Global", type:"realtime", api:"https://api.openuv.io/api/v1/uv?lat=0&lng=0", extract: d => d.result?.uv || 0, min:0, max:12, unit:' UV'}
 ];
-// ===== HTML та решта коду (як у попередній версії) =====
+
+// ===== HTML структура =====
 const heatmap = document.getElementById("heatmap");
 const pulseCanvas = document.getElementById("pulseCanvas");
 let pulseCtx = pulseCanvas.getContext("2d");
@@ -79,6 +158,7 @@ let prevNorm = Array(indicators.length).fill(50);
 let prevDelta = Array(indicators.length).fill(0);
 let pulseHistory = [];
 let trendHistory = indicators.map(()=>[]);
+
 indicators.forEach((ind,i)=>{
   const cell = document.createElement("div");
   cell.className = "cell";
@@ -86,25 +166,29 @@ indicators.forEach((ind,i)=>{
   cell.innerHTML = `${ind.name}<div class="value">— ${ind.unit||''}</div><div class="tooltip"></div><canvas class="trendCanvas" id="trend${i}"></canvas>`;
   heatmap.appendChild(cell);
 });
+
 const center = document.createElement("div");
 center.className = "center-index";
 center.id = "center";
 center.textContent = "Стан системи: —";
 heatmap.appendChild(center);
 
-// Resize canvases
+// ===== Адаптація canvas під розмір =====
 function resizeCanvases() {
   const trendCanvases = document.querySelectorAll('.trendCanvas');
-  trendCanvases.forEach(c => { c.width = c.parentElement.clientWidth - 16; c.height = 90; });
+  trendCanvases.forEach(c => { 
+    c.width = c.parentElement.clientWidth - 12; 
+    c.height = 80; 
+  });
   pulseCanvas.width = pulseCanvas.parentElement.clientWidth - 40;
-  pulseCanvas.height = 180;
+  pulseCanvas.height = 200;
   drawPulse();
   trendHistory.forEach((_,i) => drawTrend(i));
 }
 window.addEventListener('resize', resizeCanvases);
 setTimeout(resizeCanvases, 100);
 
-// Fetch
+// ===== Fetch даних =====
 async function fetchVal(ind) {
   try {
     const resp = await fetch(ind.api);
@@ -122,20 +206,21 @@ function normalize(val, min, max) {
   return Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
 }
 
-// Color
+// ===== Колір фону =====
 function getColor(norm) {
   if (norm < 30) return {bg:"#ff0000", alert:true};
   if (norm < 70) return {bg:"#ffaa00", alert:false};
   return {bg:"#00ff00", alert:false};
 }
 
-// Update
+// ===== Оновлення даних =====
 async function update(type) {
   const promises = indicators.filter(ind => ind.type === type).map(fetchVal);
   const rawValues = await Promise.all(promises);
   let totalNorm = 0;
   let validCount = 0;
   let idx = 0;
+
   indicators.forEach((ind, i) => {
     if (ind.type === type) {
       const raw = rawValues[idx++];
@@ -163,10 +248,12 @@ async function update(type) {
       validCount++;
     }
   });
+
   const avgNorm = validCount > 0 ? totalNorm / validCount : 50;
   pulseHistory.push(avgNorm);
   if (pulseHistory.length > 300) pulseHistory.shift();
   drawPulse();
+
   let status = "Норма";
   let statusColor = "#ffaa00";
   if (avgNorm < 30) { status = "Погано"; statusColor = "#ff0000"; }
@@ -175,7 +262,7 @@ async function update(type) {
   center.style.borderColor = statusColor;
 }
 
-// Trend
+// ===== Малювання тренду в клітинці =====
 function drawTrend(i) {
   const canvas = document.getElementById(`trend${i}`);
   const ctx = canvas.getContext("2d");
@@ -192,12 +279,12 @@ function drawTrend(i) {
   ctx.stroke();
 }
 
-// Pulse
+// ===== Малювання загального пульсу =====
 function drawPulse() {
   pulseCtx.clearRect(0, 0, pulseCanvas.width, pulseCanvas.height);
   if (pulseHistory.length < 2) return;
   pulseCtx.strokeStyle = "#ff00ff";
-  pulseCtx.lineWidth = 2.5;
+  pulseCtx.lineWidth = 3;
   pulseCtx.beginPath();
   pulseHistory.forEach((v, i) => {
     const x = i * (pulseCanvas.width / (pulseHistory.length - 1));
@@ -207,26 +294,7 @@ function drawPulse() {
   pulseCtx.stroke();
 }
 
-// Export
-document.getElementById("exportBtn").addEventListener("click", () => {
-  const data = {
-    timestamp: new Date().toISOString(),
-    indicators: indicators.map((ind, i) => ({
-      name: ind.name,
-      currentNorm: prevNorm[i],
-      history: trendHistory[i]
-    })),
-    pulse: pulseHistory
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "ibonarium_40api_data.json";
-  a.click();
-});
-
-// Init
+// ===== Ініціалізація =====
 update("realtime");
 update("hourly");
 setInterval(() => update("realtime"), 60000);
