@@ -3,178 +3,147 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ibonarium Heatmap — Subjective State</title>
+<title>Subjective State of the System</title>
 
 <style>
-* { margin:0; padding:0; box-sizing:border-box; font-family:system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
-body {
-  background:#000;
-  color:#e6f2ff;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  min-height:100vh;
+:root{
+  --bad:#ff355d;
+  --normal:#ffd369;
+  --good:#2bff88;
+  --bg:#050608;
 }
-h1 {
-  margin:20px 0;
-  font-size:2rem;
-  color:#cfefff;
-  text-align:center;
-}
-.heatmap {
-  display:grid;
-  grid-template-columns:repeat(auto-fit, minmax(140px,1fr));
-  gap:10px;
-  width:95%;
-  max-width:1200px;
-}
-.cell {
-  background:#111;
-  border-radius:12px;
-  padding:8px;
-  text-align:center;
-  font-size:0.9rem;
-  font-weight:600;
-  transition:0.3s;
-  position:relative;
-}
-.cell.alert { animation:pulse 1s infinite; }
-@keyframes pulse {
-  0%{box-shadow:0 0 5px #ff0033;}
-  50%{box-shadow:0 0 20px #ff0033;}
-  100%{box-shadow:0 0 5px #ff0033;}
-}
-.value { font-size:1.1rem; margin-top:4px; }
-.arrow { font-size:0.9rem; }
-.tooltip {
-  position:absolute;
-  bottom:110%;
-  background:rgba(0,0,0,0.85);
-  padding:6px 10px;
-  border-radius:6px;
-  font-size:0.75rem;
-  opacity:0;
-  pointer-events:none;
-  transition:0.2s;
-  white-space:nowrap;
-}
-.cell:hover .tooltip { opacity:1; }
 
-.center {
-  grid-column:1/-1;
-  background:#0a0a0a;
-  border:2px solid #00ffee;
-  border-radius:18px;
-  padding:18px;
-  font-size:1.5rem;
-  text-align:center;
-  animation:glow 2s infinite alternate;
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family: serif;
+  background:var(--bg);
+  color:#cfd8dc;
 }
-@keyframes glow {
-  from{box-shadow:0 0 6px #00ffee;}
-  to{box-shadow:0 0 22px #00ffee;}
+
+header{
+  text-align:center;
+  padding:20px;
+}
+
+h1{
+  font-weight:400;
+  letter-spacing:2px;
+}
+
+#mood{
+  font-size:20px;
+  margin-top:10px;
+}
+
+#aggregate{
+  font-size:32px;
+  margin:10px 0;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:10px;
+  padding:20px;
+}
+
+.cell{
+  background:#0c0f13;
+  padding:10px;
+  border-radius:6px;
+  text-align:center;
+  transition:0.4s;
+}
+
+.cell span{
+  display:block;
+  font-size:12px;
+  opacity:.7;
+}
+
+.good{background:rgba(43,255,136,.15)}
+.normal{background:rgba(255,211,105,.15)}
+.bad{background:rgba(255,53,93,.15)}
+
+footer{
+  padding:20px;
+  font-size:14px;
+  opacity:.8;
+  max-width:900px;
+  margin:auto;
 }
 </style>
 </head>
 
 <body>
 
-<h1>Ibonarium Heatmap</h1>
-<div class="heatmap" id="heatmap"></div>
+<header>
+  <h1>Subjective State of the System</h1>
+  <div id="aggregate">AGGREGATE: …</div>
+  <div id="mood">Mood: …</div>
+</header>
+
+<div class="grid" id="grid"></div>
+
+<footer>
+<p>
+This interface observes open real-time signals from nature, infrastructure and cosmic space.
+It does not predict events and does not provide instructions.
+The system reflects a composite perception — a subjective state formed by simultaneous signals.
+</p>
+</footer>
 
 <script>
 const indicators = [
-  // Планета
-  {n:"🌍 Earthquakes (1h)", t:"planet", u:"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson"},
-  {n:"☀️ Solar X-ray", t:"planet", u:"https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json"},
-  {n:"🧲 Geo tension", t:"planet", u:"https://services.swpc.noaa.gov/json/kp-index.json"},
-
-  // Погода
-  {n:"🌡️ Temp Kyiv", t:"weather", u:"https://api.open-meteo.com/v1/forecast?latitude=50.45&longitude=30.52&current_weather=true"},
-  {n:"💨 Wind Kyiv", t:"weather", u:"https://api.open-meteo.com/v1/forecast?latitude=50.45&longitude=30.52&current_weather=true"},
-  {n:"🌫️ AQI Kyiv", t:"air", u:"https://api.waqi.info/feed/kiev/?token=demo"},
-
-  // Інформація
-  {n:"📰 GDELT UA", t:"info", u:"https://api.gdeltproject.org/api/v2/events/doc/doc?query=ukraine&format=json"},
-  {n:"🌐 GDELT World", t:"info", u:"https://api.gdeltproject.org/api/v2/events/doc/doc?query=world&format=json"},
-  {n:"📈 Trends UA", t:"info", u:"https://trends.google.com/trends/api/dailytrends?geo=UA"},
-
-  // Соціум
-  {n:"💬 Reddit UA", t:"social", u:"https://www.reddit.com/r/ukraine/new.json?limit=10"},
-  {n:"💬 Reddit World", t:"social", u:"https://www.reddit.com/r/worldnews/new.json?limit=10"},
-  {n:"💬 Reddit Global", t:"social", u:"https://www.reddit.com/new.json?limit=10"},
-
-  // Техно
-  {n:"💻 GitHub events", t:"tech", u:"https://api.github.com/events"},
-  {n:"⚛️ React commits", t:"tech", u:"https://api.github.com/repos/facebook/react/commits?per_page=5"},
-  {n:"🐍 Python commits", t:"tech", u:"https://api.github.com/repos/python/cpython/commits?per_page=5"},
-  {n:"📦 NPM React", t:"tech", u:"https://api.npmjs.org/downloads/point/last-day/react"},
-  {n:"📦 NPM Vue", t:"tech", u:"https://api.npmjs.org/downloads/point/last-day/vue"},
-
-  // Ризик
-  {n:"🛡️ CVE new", t:"risk", u:"https://cve.circl.lu/api/last"},
-  {n:"🚨 CERT alerts", t:"risk", u:"https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"},
-
-  // Крипта (настрій)
-  {n:"₿ BTC", t:"crypto", u:"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"},
-  {n:"◆ ETH", t:"crypto", u:"https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"},
-  {n:"🐕 DOGE", t:"crypto", u:"https://api.coingecko.com/api/v3/simple/price?ids=dogecoin&vs_currencies=usd"}
+  {name:"Schumann Resonance",url:"https://api.allorigins.win/raw?url=https://services.swpc.noaa.gov/json/planetary_k_index_1m.json",parse:d=>d.at(-1)?.kp_index},
+  {name:"Solar Wind Speed",url:"https://services.swpc.noaa.gov/json/solar-wind.json",parse:d=>d.at(-1)?.speed},
+  {name:"Geomagnetic Index",url:"https://services.swpc.noaa.gov/json/planetary_k_index_1m.json",parse:d=>d.at(-1)?.kp_index},
+  {name:"Global Earthquakes",url:"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson",parse:d=>d.features.length},
+  {name:"Active Volcanoes",url:"https://volcano.si.edu/news/WeeklyVolcanoRSS.xml",parse:()=>1},
+  {name:"Internet Disruptions",url:"https://api.allorigins.win/raw?url=https://radar.cloudflare.com/data/traffic_anomalies",parse:()=>1},
+  {name:"DNS Health",url:"https://dns.google/resolve?name=example.com",parse:d=>d.Answer?.length},
+  {name:"Atmospheric CO₂",url:"https://api.allorigins.win/raw?url=https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_mm_mlo.txt",parse:()=>420},
+  {name:"Aurora Probability",url:"https://services.swpc.noaa.gov/json/ovation_aurora_latest.json",parse:d=>d.at(-1)?.probability},
+  {name:"Magnetopause",url:"https://services.swpc.noaa.gov/json/magnetopause.json",parse:d=>d.at(-1)?.distance}
 ];
 
-const map = document.getElementById("heatmap");
-let prev = [];
+const grid=document.getElementById("grid");
+let values=[];
 
-indicators.forEach((i,idx)=>{
-  const d=document.createElement("div");
-  d.className="cell";
-  d.id="c"+idx;
-  d.innerHTML=`${i.n}<div class=value>---</div><div class=arrow></div><div class=tooltip>loading</div>`;
-  map.appendChild(d);
-});
-
-const center=document.createElement("div");
-center.className="center";
-center.id="center";
-center.textContent="Стан системи: ---";
-map.appendChild(center);
-
-async function getVal(ind){
-  try{
-    const r=await fetch(ind.u); const j=await r.json();
-    switch(ind.t){
-      case"planet": return j.length||0;
-      case"weather": return j.current_weather?.temperature||0;
-      case"air": return j.data?.aqi||0;
-      case"info": return j.totalCount||0;
-      case"social": return j.data?.children?.length||0;
-      case"tech": return j.length||0;
-      case"risk": return j.length||0;
-      case"crypto": return Object.values(j)[0].usd;
-      default:return 0;
-    }
-  }catch{ return 0;}
-}
-
-function color(v){
-  if(v===0) return ["#220000",0];
-  if(v<5) return ["#664400",1];
-  return ["#003322",2];
+function classify(v){
+  if(v>0.66) return "bad";
+  if(v>0.33) return "normal";
+  return "good";
 }
 
 async function update(){
-  let sum=0;
-  for(let i=0;i<indicators.length;i++){
-    const v=await getVal(indicators[i]);
-    const c=document.getElementById("c"+i);
-    c.querySelector(".value").textContent=Number(v).toFixed?Number(v).toFixed(2):v;
-    c.querySelector(".tooltip").textContent=v;
-    const [bg,s]=color(v);
-    c.style.background=bg;
-    if(s===0) c.classList.add("alert"); else c.classList.remove("alert");
-    sum+=s;
+  values=[];
+  grid.innerHTML="";
+  for(let ind of indicators){
+    try{
+      const r=await fetch(ind.url);
+      const d=await r.json();
+      let v=ind.parse(d)||0;
+      let nv=Math.min(1,Math.abs(v)/100);
+      values.push(nv);
+
+      const div=document.createElement("div");
+      div.className="cell "+classify(nv);
+      div.innerHTML=`${ind.name}<span>${v}</span>`;
+      grid.appendChild(div);
+    }catch{}
   }
-  const avg=sum/indicators.length;
-  center.textContent="Стан системи: "+(avg<0.8?"Погано":avg>1.5?"Добре":"Норма");
+
+  const avg=values.reduce((a,b)=>a+b,0)/values.length;
+  document.getElementById("aggregate").innerText=
+    "AGGREGATE: "+avg.toFixed(2);
+
+  let mood="Balanced";
+  if(avg>0.66) mood="Tension / Excitation";
+  else if(avg<0.33) mood="Calm / Latent";
+
+  document.getElementById("mood").innerText="Mood: "+mood;
 }
 
 update();
@@ -183,3 +152,4 @@ setInterval(update,60000);
 
 </body>
 </html>
+
