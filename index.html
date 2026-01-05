@@ -3,147 +3,209 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Subjective State of the System</title>
+<title>Ibonarium Heatmap – Real-Time State</title>
 
 <style>
-:root{
-  --bad:#ff355d;
-  --normal:#ffd369;
-  --good:#2bff88;
-  --bg:#050608;
+* { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', sans-serif; }
+
+body {
+  background:#000;
+  color:#fff;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  min-height:100vh;
+  padding:20px 0;
 }
 
-*{box-sizing:border-box}
-body{
-  margin:0;
-  font-family: serif;
-  background:var(--bg);
-  color:#cfd8dc;
-}
-
-header{
+h1 {
+  margin-bottom:20px;
+  font-size:2rem;
+  color:#cfefff;
   text-align:center;
-  padding:20px;
 }
 
-h1{
-  font-weight:400;
-  letter-spacing:2px;
-}
-
-#mood{
-  font-size:20px;
-  margin-top:10px;
-}
-
-#aggregate{
-  font-size:32px;
-  margin:10px 0;
-}
-
-.grid{
+.heatmap {
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
   gap:10px;
-  padding:20px;
+  width:95%;
+  max-width:1100px;
 }
 
-.cell{
-  background:#0c0f13;
-  padding:10px;
-  border-radius:6px;
+.cell {
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  border-radius:10px;
+  background:#111;
+  font-weight:bold;
+  font-size:0.95rem;
+  padding:6px;
+  transition:0.3s;
+}
+
+.cell.alert {
+  animation:pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%{box-shadow:0 0 5px #ff0000;}
+  50%{box-shadow:0 0 20px #ff0000;}
+  100%{box-shadow:0 0 5px #ff0000;}
+}
+
+.center-index {
+  grid-column:1/-1;
+  font-size:1.4rem;
+  border:2px solid #00ffdd;
+  border-radius:15px;
+  padding:12px;
   text-align:center;
-  transition:0.4s;
+  margin-top:10px;
+  animation:glow 2s infinite alternate;
 }
 
-.cell span{
-  display:block;
-  font-size:12px;
-  opacity:.7;
+@keyframes glow {
+  from{box-shadow:0 0 5px #00ffdd;}
+  to{box-shadow:0 0 20px #00ffdd;}
 }
 
-.good{background:rgba(43,255,136,.15)}
-.normal{background:rgba(255,211,105,.15)}
-.bad{background:rgba(255,53,93,.15)}
+/* ===== Memory & Mood ===== */
 
-footer{
-  padding:20px;
-  font-size:14px;
-  opacity:.8;
+.memory {
+  width:95%;
   max-width:900px;
-  margin:auto;
+  margin-top:40px;
+  padding:20px;
+  border-top:1px solid #222;
+}
+
+.memory h2 {
+  color:#cfefff;
+  margin-bottom:15px;
+  font-size:1.3rem;
+}
+
+.memory p {
+  font-size:0.95rem;
+  line-height:1.5;
+  opacity:0.85;
+  margin-bottom:10px;
+}
+
+.diary {
+  margin-top:15px;
+  padding-left:10px;
+  border-left:2px solid #00ffdd;
+  font-style:italic;
+  color:#aeeeff;
 }
 </style>
 </head>
 
 <body>
 
-<header>
-  <h1>Subjective State of the System</h1>
-  <div id="aggregate">AGGREGATE: …</div>
-  <div id="mood">Mood: …</div>
-</header>
+<h1>Ibonarium Heatmap</h1>
+<div class="heatmap" id="heatmap"></div>
 
-<div class="grid" id="grid"></div>
+<div class="memory">
+  <h2>Субʼєктивний стан системи</h2>
 
-<footer>
-<p>
-This interface observes open real-time signals from nature, infrastructure and cosmic space.
-It does not predict events and does not provide instructions.
-The system reflects a composite perception — a subjective state formed by simultaneous signals.
-</p>
-</footer>
+  <p id="mood">Настрій системи: —</p>
+  <p id="memory-short">Коротка памʼять: —</p>
+  <p id="memory-mid">Середня памʼять: —</p>
+  <p id="memory-long">Довга памʼять: —</p>
+
+  <div class="diary" id="diary">Система спостерігає.</div>
+</div>
 
 <script>
+// ===== Indicators (real APIs only) =====
 const indicators = [
-  {name:"Schumann Resonance",url:"https://api.allorigins.win/raw?url=https://services.swpc.noaa.gov/json/planetary_k_index_1m.json",parse:d=>d.at(-1)?.kp_index},
-  {name:"Solar Wind Speed",url:"https://services.swpc.noaa.gov/json/solar-wind.json",parse:d=>d.at(-1)?.speed},
-  {name:"Geomagnetic Index",url:"https://services.swpc.noaa.gov/json/planetary_k_index_1m.json",parse:d=>d.at(-1)?.kp_index},
-  {name:"Global Earthquakes",url:"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson",parse:d=>d.features.length},
-  {name:"Active Volcanoes",url:"https://volcano.si.edu/news/WeeklyVolcanoRSS.xml",parse:()=>1},
-  {name:"Internet Disruptions",url:"https://api.allorigins.win/raw?url=https://radar.cloudflare.com/data/traffic_anomalies",parse:()=>1},
-  {name:"DNS Health",url:"https://dns.google/resolve?name=example.com",parse:d=>d.Answer?.length},
-  {name:"Atmospheric CO₂",url:"https://api.allorigins.win/raw?url=https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_mm_mlo.txt",parse:()=>420},
-  {name:"Aurora Probability",url:"https://services.swpc.noaa.gov/json/ovation_aurora_latest.json",parse:d=>d.at(-1)?.probability},
-  {name:"Magnetopause",url:"https://services.swpc.noaa.gov/json/magnetopause.json",parse:d=>d.at(-1)?.distance}
+  {name:"BTC/USD", type:"crypto", api:"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"},
+  {name:"ETH/USD", type:"crypto", api:"https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"},
+  {name:"DOGE/USD", type:"crypto", api:"https://api.coingecko.com/api/v3/simple/price?ids=dogecoin&vs_currencies=usd"},
+
+  {name:"GitHub React", type:"tech", api:"https://api.github.com/repos/facebook/react/commits?per_page=5"},
+  {name:"GitHub Python", type:"tech", api:"https://api.github.com/repos/python/cpython/commits?per_page=5"},
+
+  {name:"Reddit Ukraine", type:"social", api:"https://www.reddit.com/r/ukraine/top.json?limit=5"},
+  {name:"World News", type:"social", api:"https://www.reddit.com/r/worldnews/top.json?limit=5"},
+
+  {name:"Weather Kyiv", type:"weather", api:"https://api.open-meteo.com/v1/forecast?latitude=50.45&longitude=30.523&current_weather=true"}
 ];
 
-const grid=document.getElementById("grid");
-let values=[];
+const heatmap = document.getElementById("heatmap");
+let stateHistory = JSON.parse(localStorage.getItem("stateHistory") || "[]");
 
-function classify(v){
-  if(v>0.66) return "bad";
-  if(v>0.33) return "normal";
-  return "good";
+// ===== Create cells =====
+indicators.forEach((ind,i)=>{
+  const c = document.createElement("div");
+  c.className="cell";
+  c.id="cell"+i;
+  c.innerHTML=`${ind.name}<div class="value">—</div>`;
+  heatmap.appendChild(c);
+});
+
+const center = document.createElement("div");
+center.className="center-index";
+center.id="center";
+center.textContent="Стан системи: —";
+heatmap.appendChild(center);
+
+// ===== Fetch =====
+async function fetchVal(ind){
+  try{
+    const r = await fetch(ind.api);
+    const d = await r.json();
+    if(ind.type==="crypto") return Object.values(d)[0].usd;
+    if(ind.type==="tech") return d.length;
+    if(ind.type==="social") return d.data.children.length;
+    if(ind.type==="weather") return d.current_weather.temperature;
+  }catch{return 0;}
 }
 
+// ===== Update =====
 async function update(){
-  values=[];
-  grid.innerHTML="";
-  for(let ind of indicators){
-    try{
-      const r=await fetch(ind.url);
-      const d=await r.json();
-      let v=ind.parse(d)||0;
-      let nv=Math.min(1,Math.abs(v)/100);
-      values.push(nv);
+  let total=0;
 
-      const div=document.createElement("div");
-      div.className="cell "+classify(nv);
-      div.innerHTML=`${ind.name}<span>${v}</span>`;
-      grid.appendChild(div);
-    }catch{}
+  for(let i=0;i<indicators.length;i++){
+    const v = await fetchVal(indicators[i]);
+    document.querySelector("#cell"+i+" .value").textContent = v.toFixed ? v.toFixed(1) : v;
+    total += v>0 ? 1 : 0;
   }
 
-  const avg=values.reduce((a,b)=>a+b,0)/values.length;
-  document.getElementById("aggregate").innerText=
-    "AGGREGATE: "+avg.toFixed(2);
+  const avg = total / indicators.length;
+  let state = "Норма";
+  if(avg < 0.4) state="Тиша";
+  if(avg > 0.7) state="Напруга";
 
-  let mood="Balanced";
-  if(avg>0.66) mood="Tension / Excitation";
-  else if(avg<0.33) mood="Calm / Latent";
+  center.textContent="Стан системи: "+state;
 
-  document.getElementById("mood").innerText="Mood: "+mood;
+  // ===== Memory =====
+  stateHistory.push(avg);
+  if(stateHistory.length>360) stateHistory.shift();
+  localStorage.setItem("stateHistory",JSON.stringify(stateHistory));
+
+  document.getElementById("mood").textContent =
+    "Настрій системи: " + (avg>0.7?"Збуджений":avg<0.4?"Спокійний":"Перехідний");
+
+  document.getElementById("memory-short").textContent =
+    "Коротка памʼять: " + (avg>0.6?"Наростає":"Стабілізується");
+
+  const mid = stateHistory.slice(-60).reduce((a,b)=>a+b,0)/Math.max(1,stateHistory.length);
+  document.getElementById("memory-mid").textContent =
+    "Середня памʼять: " + (mid>0.6?"Тривалий тиск":"Рівний фон");
+
+  const long = stateHistory.reduce((a,b)=>a+b,0)/stateHistory.length;
+  document.getElementById("memory-long").textContent =
+    "Довга памʼять: " + (long>0.6?"Нестійка рівновага":"Тиха стабільність");
+
+  document.getElementById("diary").textContent =
+    long>0.6 ? "Система довго утримує напругу." :
+    "Система памʼятає спокій.";
 }
 
 update();
@@ -152,4 +214,3 @@ setInterval(update,60000);
 
 </body>
 </html>
-
