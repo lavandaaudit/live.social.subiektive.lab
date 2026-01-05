@@ -3,163 +3,214 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ibonarium Heatmap – Trend & Memory</title>
+<title>Ibonarium Heatmap – Trend & Memory (Покращено)</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI', sans-serif; }
 body { background:#000; color:#fff; display:flex; flex-direction:column; align-items:center; min-height:100vh; padding:20px 0; }
 h1 { margin-bottom:20px; font-size:2rem; color:#cfefff; text-align:center; }
-.heatmap { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; width:95%; max-width:1200px; }
-.cell { display:flex; flex-direction:column; justify-content:center; align-items:center; border-radius:10px; background:#111; font-weight:bold; font-size:0.95rem; padding:6px; transition:0.3s; position:relative;}
+.heatmap { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; width:95%; max-width:1200px; }
+.cell { display:flex; flex-direction:column; justify-content:center; align-items:center; border-radius:12px; background:#111; font-weight:bold; font-size:1rem; padding:8px; transition:0.3s; position:relative; cursor:pointer; }
 .cell.alert { animation:pulseRed 1s infinite; }
+.cell:hover .tooltip { opacity:1; }
+.tooltip { position:absolute; bottom:100%; left:50%; transform:translateX(-50%); background:#333; padding:5px 10px; border-radius:5px; font-size:0.8rem; opacity:0; transition:0.2s; white-space:nowrap; z-index:10; }
 @keyframes pulseRed {0%{box-shadow:0 0 5px #ff0000;}50%{box-shadow:0 0 20px #ff0000;}100%{box-shadow:0 0 5px #ff0000;}}
-.center-index { grid-column:1/-1; font-size:1.4rem; border:2px solid #00ffdd; border-radius:15px; padding:12px; text-align:center; margin-top:10px; animation:glow 2s infinite alternate;}
+.center-index { grid-column:1/-1; font-size:1.5rem; border:2px solid #00ffdd; border-radius:15px; padding:14px; text-align:center; margin-top:12px; animation:glow 2s infinite alternate;}
 @keyframes glow { from{box-shadow:0 0 5px #00ffdd;} to{box-shadow:0 0 20px #00ffdd;} }
-#pulseCanvas { margin-top:20px; background:#111; border-radius:10px; width:90%; max-width:1200px; height:150px; }
-.trendCanvas { width:100%; height:80px; margin-top:5px; background:#111; border-radius:5px; }
+#pulseCanvas { margin-top:20px; background:#111; border-radius:10px; width:90%; max-width:1200px; height:180px; }
+.trendCanvas { width:100%; height:90px; margin-top:6px; background:#111; border-radius:5px; }
+#exportBtn { margin-top:20px; padding:10px 20px; background:#00ffdd; color:#000; border:none; border-radius:5px; cursor:pointer; font-weight:bold; }
+@media (max-width:600px) { .cell { font-size:0.9rem; } .trendCanvas { height:70px; } }
 </style>
 </head>
 <body>
-
-<h1>Ibonarium Heatmap – Trend & Memory</h1>
+<h1>Ibonarium Heatmap – Trend & Memory (v2)</h1>
 <div class="heatmap" id="heatmap"></div>
 <canvas id="pulseCanvas"></canvas>
-
+<button id="exportBtn">Експорт даних (JSON)</button>
 <script>
-// ===== Індикатори =====
+// ===== Індикатори з нормалізацією =====
+const GITHUB_TOKEN = ''; // Вставте ваш GitHub token тут для уникнення rate limit
+const headers = GITHUB_TOKEN ? { 'Authorization': `token ${GITHUB_TOKEN}` } : {};
 const indicators = [
-  {name:"BTC/USD", type:"realtime", api:"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"},
-  {name:"ETH/USD", type:"realtime", api:"https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd"},
-  {name:"DOGE/USD", type:"realtime", api:"https://api.coingecko.com/api/v3/simple/price?ids=dogecoin&vs_currencies=usd"},
-  {name:"GitHub React", type:"realtime", api:"https://api.github.com/repos/facebook/react/commits?per_page=5"},
-  {name:"GitHub Python", type:"realtime", api:"https://api.github.com/repos/python/cpython/commits?per_page=5"},
-  {name:"Kyiv Temp", type:"realtime", api:"https://api.open-meteo.com/v1/forecast?latitude=50.45&longitude=30.523&current_weather=true"},
-  {name:"Kyiv Wind", type:"realtime", api:"https://api.open-meteo.com/v1/forecast?latitude=50.45&longitude=30.523&current_weather=true"},
-  // Менш ріалтаймні (Reddit, CVE, космос)
-  {name:"Reddit r/ukraine", type:"hourly", api:"https://www.reddit.com/r/ukraine/top.json?limit=5"},
-  {name:"CVE Latest", type:"hourly", api:"https://cve.circl.lu/api/last"},
-  {name:"Solar Wind", type:"hourly", api:"https://services.swpc.noaa.gov/json/solar-wind.json"}
+  {name:"BTC/USD", type:"realtime", api:"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd", extract: d => d.bitcoin.usd, min:0, max:100000, unit:'$'}, // Норм: 0-100k
+  {name:"ETH/USD", type:"realtime", api:"https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd", extract: d => d.ethereum.usd, min:0, max:5000, unit:'$'},
+  {name:"DOGE/USD", type:"realtime", api:"https://api.coingecko.com/api/v3/simple/price?ids=dogecoin&vs_currencies=usd", extract: d => d.dogecoin.usd, min:0, max:1, unit:'$'},
+  {name:"GitHub React", type:"realtime", api:"https://api.github.com/repos/facebook/react/commits?per_page=5", extract: d => d.length, min:0, max:10, unit:' commits', headers},
+  {name:"GitHub Python", type:"realtime", api:"https://api.github.com/repos/python/cpython/commits?per_page=5", extract: d => d.length, min:0, max:10, unit:' commits', headers},
+  {name:"Kyiv Temp", type:"realtime", api:"https://api.open-meteo.com/v1/forecast?latitude=50.45&longitude=30.523&current_weather=true", extract: d => d.current_weather.temperature, min:-20, max:40, unit:'°C'},
+  {name:"Kyiv Wind", type:"realtime", api:"https://api.open-meteo.com/v1/forecast?latitude=50.45&longitude=30.523&current_weather=true", extract: d => d.current_weather.windspeed, min:0, max:50, unit:' km/h'},
+  // Hourly
+  {name:"Reddit r/ukraine", type:"hourly", api:"https://www.reddit.com/r/ukraine/top.json?limit=5&t=day", extract: d => d.data.children.length, min:0, max:5, unit:' posts'},
+  {name:"CVE Latest", type:"hourly", api:"https://cve.circl.lu/api/last/30", extract: d => d.length, min:0, max:30, unit:' CVEs'}, // Останні 30
+  {name:"Solar Density", type:"hourly", api:"https://services.swpc.noaa.gov/products/solar-wind/plasma-6-hour.json", extract: d => parseFloat(d[d.length-1][1]) || 0, min:0, max:50, unit:' p/cm³'}, // Реальні дані
+  // Нові
+  {name:"X Ukraine Mentions", type:"hourly", api:"https://api.allorigins.win/get?url=https%3A//api.x.com/2/tweets/search/recent%3Fquery=ukraine", extract: d => JSON.parse(d.contents).meta.result_count || 0, min:0, max:1000, unit:' mentions'} // Placeholder API (потрібен proxy або реальний)
 ];
-
-// ===== HTML клітинки =====
+// ===== HTML =====
 const heatmap = document.getElementById("heatmap");
 const pulseCanvas = document.getElementById("pulseCanvas");
-const pulseCtx = pulseCanvas.getContext("2d");
-
-let prevValues = Array(indicators.length).fill(0);
+let pulseCtx = pulseCanvas.getContext("2d");
+let prevNorm = Array(indicators.length).fill(50); // Початкове 50%
+let prevDelta = Array(indicators.length).fill(0);
 let pulseHistory = [];
-let trendHistory = Array(indicators.length).fill(null).map(()=>[]); // пам'ять для кожного індикатора
-
+let trendHistory = indicators.map(()=>[]); // До 120 точок (2 години для realtime)
 indicators.forEach((ind,i)=>{
-  const cell=document.createElement("div");
-  cell.className="cell";
-  cell.id="cell"+i;
-  cell.innerHTML=`${ind.name}<div class="value">—</div><canvas class="trendCanvas" id="trend${i}"></canvas>`;
+  const cell = document.createElement("div");
+  cell.className = "cell";
+  cell.id = "cell" + i;
+  cell.innerHTML = `${ind.name}<div class="value">— ${ind.unit||''}</div><div class="tooltip"></div><canvas class="trendCanvas" id="trend${i}"></canvas>`;
   heatmap.appendChild(cell);
 });
-
 const center = document.createElement("div");
-center.className="center-index";
-center.id="center";
-center.textContent="Стан системи: —";
+center.className = "center-index";
+center.id = "center";
+center.textContent = "Стан системи: —";
 heatmap.appendChild(center);
 
-// ===== Отримання даних =====
-async function fetchVal(ind){
-  try{
-    const r=await fetch(ind.api);
-    const d=await r.json();
-    switch(ind.type){
-      case "realtime":
-        if(ind.api.includes("coingecko")) return Object.values(d)[0].usd||0;
-        if(ind.api.includes("github")) return d.length||0;
-        if(ind.api.includes("open-meteo")) return d.current_weather?.temperature||0;
-        return 0;
-      case "hourly":
-        if(ind.api.includes("reddit")) return d.data?.children?.length||0;
-        if(ind.api.includes("cve")) return d.length||0;
-        return Math.random()*100;
-      default: return 0;
-    }
-  }catch{return 0;}
+ // Resize canvas
+function resizeCanvases() {
+  const trendCanvases = document.querySelectorAll('.trendCanvas');
+  trendCanvases.forEach(c => { c.width = c.parentElement.clientWidth - 16; c.height = 90; }); // Padding
+  pulseCanvas.width = pulseCanvas.parentElement.clientWidth - 40;
+  pulseCanvas.height = 180;
+  drawPulse(); // Redraw
+  trendHistory.forEach((_,i) => drawTrend(i));
 }
+window.addEventListener('resize', resizeCanvases);
+setTimeout(resizeCanvases, 100); // Init
 
-// ===== Колір =====
-function getColor(value){
-  if(value<20) return {color:"#ff0000", alert:true};
-  if(value<50) return {color:"#ffaa00", alert:false};
-  return {color:"#00ff00", alert:false};
-}
-
-// ===== Оновлення Heatmap & Pulse =====
-async function update(type){
-  let totalState=0;
-  for(let i=0;i<indicators.length;i++){
-    if((type==="realtime" && indicators[i].type==="realtime") || (type==="hourly" && indicators[i].type==="hourly")){
-      const val=await fetchVal(indicators[i]);
-      prevValues[i]=val;
-      totalState+=val;
-
-      const cell=document.getElementById("cell"+i);
-      cell.querySelector(".value").textContent=val.toFixed?val.toFixed(2):val;
-      const {color,alert}=getColor(val);
-      cell.style.background=color;
-      if(alert) cell.classList.add("alert"); else cell.classList.remove("alert");
-
-      // ===== Модуль пам'яті тренду =====
-      trendHistory[i].push(val);
-      if(trendHistory[i].length>100) trendHistory[i].shift();
-      drawTrend(i);
-    }else{
-      totalState+=prevValues[i];
-    }
+// ===== Fetch =====
+async function fetchVal(ind) {
+  try {
+    const resp = await fetch(ind.api, ind.headers ? { headers: ind.headers } : {});
+    if (!resp.ok) throw new Error(resp.status);
+    const d = await resp.json();
+    return ind.extract(d);
+  } catch (e) {
+    console.error(`Error fetching ${ind.name}:`, e);
+    return null; // Null для skip
   }
-  const avgState = totalState/indicators.length;
-  pulseHistory.push(avgState);
-  if(pulseHistory.length>200) pulseHistory.shift();
+}
+
+function normalize(val, min, max) {
+  if (val === null) return null;
+  return Math.max(0, Math.min(100, ((val - min) / (max - min)) * 100));
+}
+
+// ===== Color =====
+function getColor(norm) {
+  if (norm < 30) return {bg:"#ff0000", alert:true}; // Розширено для градації
+  if (norm < 70) return {bg:"#ffaa00", alert:false};
+  return {bg:"#00ff00", alert:false};
+}
+
+// ===== Update =====
+async function update(type) {
+  const promises = indicators.filter(ind => ind.type === type).map(fetchVal);
+  const rawValues = await Promise.all(promises);
+  let totalNorm = 0;
+  let validCount = 0;
+
+  indicators.forEach((ind, i) => {
+    if (ind.type === type) {
+      const raw = rawValues.shift();
+      const norm = raw !== null ? normalize(raw, ind.min, ind.max) : prevNorm[i];
+      if (norm !== null) {
+        prevNorm[i] = norm;
+        prevDelta[i] = trendHistory[i].length > 0 ? norm - trendHistory[i][trendHistory[i].length-1][0] : 0;
+        totalNorm += norm;
+        validCount++;
+      }
+      // Update cell
+      const cell = document.getElementById("cell" + i);
+      const valueEl = cell.querySelector(".value");
+      const tooltip = cell.querySelector(".tooltip");
+      if (raw !== null) valueEl.textContent = `${raw.toFixed(2)} ${ind.unit||''} (${norm.toFixed(0)}%)`;
+      else valueEl.textContent = `— (${prevNorm[i].toFixed(0)}%)`;
+      tooltip.textContent = `Delta: ${prevDelta[i].toFixed(1)}%`;
+      const {bg, alert} = getColor(prevNorm[i]);
+      cell.style.background = bg;
+      if (alert) cell.classList.add("alert"); else cell.classList.remove("alert");
+
+      // Trend memory
+      if (norm !== null) trendHistory[i].push([norm, raw]);
+      if (trendHistory[i].length > 120) trendHistory[i].shift();
+      drawTrend(i);
+    } else if (prevNorm[i] !== null) {
+      totalNorm += prevNorm[i];
+      validCount++;
+    }
+  });
+
+  const avgNorm = validCount > 0 ? totalNorm / validCount : 50;
+  pulseHistory.push(avgNorm);
+  if (pulseHistory.length > 300) pulseHistory.shift();
   drawPulse();
 
-  let systemStatus="Норма";
-  if(avgState<20) systemStatus="Погано";
-  else if(avgState>50) systemStatus="Добре";
-  center.textContent="Стан системи: "+systemStatus;
+  let status = "Норма";
+  let statusColor = "#ffaa00";
+  if (avgNorm < 30) { status = "Погано"; statusColor = "#ff0000"; }
+  else if (avgNorm > 70) { status = "Добре"; statusColor = "#00ff00"; }
+  center.textContent = `Стан системи: ${status} (${avgNorm.toFixed(1)}%)`;
+  center.style.borderColor = statusColor;
 }
 
-// ===== Лінії тренду =====
-function drawTrend(i){
-  const canvas = document.getElementById("trend"+i);
+// ===== Trend =====
+function drawTrend(i) {
+  const canvas = document.getElementById(`trend${i}`);
   const ctx = canvas.getContext("2d");
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.strokeStyle="#00ffdd";
-  ctx.lineWidth=1.5;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (trendHistory[i].length < 2) return;
+  ctx.strokeStyle = "#00ffdd";
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  trendHistory[i].forEach((v,j)=>{
-    const x=j*(canvas.width/trendHistory[i].length);
-    const y=canvas.height-(v/100)*canvas.height;
-    if(j===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  trendHistory[i].forEach(([norm, raw], j) => {
+    const x = j * (canvas.width / (trendHistory[i].length - 1));
+    const y = canvas.height * (1 - norm / 100);
+    if (j === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   });
   ctx.stroke();
 }
 
-// ===== Пульс системи =====
-function drawPulse(){
-  pulseCtx.clearRect(0,0,pulseCanvas.width,pulseCanvas.height);
-  pulseCtx.strokeStyle="#ff00ff";
-  pulseCtx.lineWidth=2;
+// ===== Pulse =====
+function drawPulse() {
+  pulseCtx.clearRect(0, 0, pulseCanvas.width, pulseCanvas.height);
+  if (pulseHistory.length < 2) return;
+  pulseCtx.strokeStyle = "#ff00ff";
+  pulseCtx.lineWidth = 2.5;
   pulseCtx.beginPath();
-  pulseHistory.forEach((v,i)=>{
-    const x=i*(pulseCanvas.width/pulseHistory.length);
-    const y=pulseCanvas.height-(v/100)*pulseCanvas.height;
-    if(i===0) pulseCtx.moveTo(x,y); else pulseCtx.lineTo(x,y);
+  pulseHistory.forEach((v, i) => {
+    const x = i * (pulseCanvas.width / (pulseHistory.length - 1));
+    const y = pulseCanvas.height * (1 - v / 100);
+    if (i === 0) pulseCtx.moveTo(x, y); else pulseCtx.lineTo(x, y);
   });
-  pulseCtx.stroke();
+  ctx.stroke();
 }
 
-// ===== Ініціалізація =====
+// ===== Export =====
+document.getElementById("exportBtn").addEventListener("click", () => {
+  const data = {
+    timestamp: new Date().toISOString(),
+    indicators: indicators.map((ind, i) => ({
+      name: ind.name,
+      currentNorm: prevNorm[i],
+      history: trendHistory[i]
+    })),
+    pulse: pulseHistory
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "ibonarium_data.json";
+  a.click();
+});
+
+// ===== Init =====
 update("realtime");
 update("hourly");
-setInterval(()=>update("realtime"),60000); // щохвилини
-setInterval(()=>update("hourly"),3600000); // раз на годину
+setInterval(() => update("realtime"), 60000);
+setInterval(() => update("hourly"), 3600000);
 </script>
-
 </body>
 </html>
